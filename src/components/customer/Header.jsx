@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, QrCode, Clock, Lock } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 export function Header() {
   const { store, setIsQRModalOpen, navigateTo } = useStore();
@@ -16,10 +17,14 @@ export function Header() {
           <div className="flex items-center gap-3 min-w-0">
             {store.logo_url ? (
               <img
-                src={store.logo_url}
+                src={getOptimizedImageUrl(store.logo_url, { width: 96, height: 96 })}
                 alt={store.name}
+                width="48"
+                height="48"
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border border-emerald-800/10 shadow-xs shrink-0"
                 loading="eager"
+                fetchPriority="high"
+                decoding="async"
               />
             ) : (
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-900 text-amber-300 font-bold flex items-center justify-center text-lg shadow-xs shrink-0">

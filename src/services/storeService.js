@@ -49,6 +49,61 @@ function initializeLocalStorage() {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
   }
 }
+/**
+ * Helper to compress image on client-side before uploading to Supabase Storage
+ * Reduces 5MB-10MB mobile camera photos down to ~60-120KB WebP
+ */
+function compressImageForUpload(file, maxDim = 900, quality = 0.82) {
+  return new Promise((resolve) => {
+    // If not an image or SVG, return original file
+    if (!file.type || !file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+      return resolve({ blob: file, ext: file.name ? file.name.split('.').pop() : 'jpg' });
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve({ blob, ext: 'webp' });
+              } else {
+                resolve({ blob: file, ext: file.name.split('.').pop() || 'jpg' });
+              }
+            },
+            'image/webp',
+            quality
+          );
+        } catch {
+          resolve({ blob: file, ext: file.name.split('.').pop() || 'jpg' });
+        }
+      };
+      img.onerror = () => resolve({ blob: file, ext: file.name.split('.').pop() || 'jpg' });
+      img.src = event.target.result;
+    };
+    reader.onerror = () => resolve({ blob: file, ext: file.name.split('.').pop() || 'jpg' });
+    reader.readAsDataURL(file);
+  });
+}
 
 export const storeService = {
   /**
@@ -402,15 +457,20 @@ export const storeService = {
   },
 
   /**
-   * Upload Image (Uses Supabase Storage if configured, or client-side compressed base64)
+   * Upload Image (Client-side compressed WebP, stored in Supabase Storage with long-term cache headers)
    */
   async uploadImage(file, folder = 'products') {
+    const { blob, ext } = await compressImageForUpload(file);
+
     if (isSupabaseConfigured && supabase) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
       const { data, error } = await supabase.storage
         .from('store-media')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+        .upload(fileName, blob, {
+          contentType: ext === 'webp' ? 'image/webp' : file.type,
+          cacheControl: '31536000, immutable',
+          upsert: true,
+        });
 
       if (error) throw error;
 
@@ -424,33 +484,9 @@ export const storeService = {
     // Client-side compressed data URL for instant mobile preview and local testing
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 800;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/webp', 0.82));
-        };
-        img.onerror = reject;
-        img.src = event.target.result;
-      };
+      reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(blob);
     });
   },
 

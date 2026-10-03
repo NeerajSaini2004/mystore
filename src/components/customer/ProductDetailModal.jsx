@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Phone, MessageCircle, CheckCircle2, XCircle, Tag, MapPin, Share2, Check } from 'lucide-react';
 import { formatCurrency } from '../../utils/calculations';
 import { useStore } from '../../context/StoreContext';
+import { OptimizedImage } from '../common/OptimizedImage';
 
 export function ProductDetailModal() {
   const { selectedProduct, setSelectedProduct, store, categories } = useStore();
@@ -112,23 +113,20 @@ export function ProductDetailModal() {
         <div className="overflow-y-auto no-scrollbar">
           
           {/* Large Image Header */}
-          <div className="relative aspect-4/3 sm:aspect-16/10 w-full bg-stone-100 flex items-center justify-center">
-            {selectedProduct.image_url ? (
-              <img
-                src={selectedProduct.image_url}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-stone-400 p-8 text-center">
-                <span className="text-6xl mb-2">📦</span>
-                <span className="text-sm font-semibold">{selectedProduct.brand || 'Store Item'}</span>
-              </div>
-            )}
+          <div className="relative aspect-4/3 sm:aspect-16/10 w-full bg-stone-100 flex items-center justify-center overflow-hidden">
+            <OptimizedImage
+              src={selectedProduct.image_url}
+              alt={selectedProduct.name}
+              width={720}
+              aspectRatio="aspect-4/3 sm:aspect-16/10"
+              priority={true}
+              fallbackText={selectedProduct.brand || 'Store Item'}
+              sizes="(max-width: 640px) 95vw, 600px"
+            />
 
             {/* Discount Badge */}
             {discountPercent > 0 && (
-              <div className="absolute bottom-3 left-3 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1.5">
+              <div className="absolute bottom-3 left-3 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1.5 z-10">
                 <Tag className="w-3.5 h-3.5" />
                 <span>{discountPercent}% OFF</span>
               </div>

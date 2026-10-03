@@ -4,6 +4,7 @@ import { formatCurrency, calculateDiscountPercent } from '../../utils/calculatio
 import { storeService } from '../../services/storeService';
 import { useStore } from '../../context/StoreContext';
 import { ProductFormModal } from './ProductFormModal';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 export function ProductManager() {
   const { products, categories, refreshData } = useStore();
@@ -136,7 +137,15 @@ export function ProductManager() {
               {/* Thumbnail */}
               <div className="w-14 h-14 rounded-xl bg-stone-100 border border-stone-200 overflow-hidden shrink-0">
                 {p.image_url ? (
-                  <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                  <img
+                    src={getOptimizedImageUrl(p.image_url, { width: 112, height: 112 })}
+                    alt={p.name}
+                    width="56"
+                    height="56"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg">📦</div>
                 )}
@@ -230,7 +239,15 @@ export function ProductManager() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-stone-100 border border-stone-200 overflow-hidden shrink-0">
                           {p.image_url ? (
-                            <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                            <img
+                              src={getOptimizedImageUrl(p.image_url, { width: 80, height: 80 })}
+                              alt={p.name}
+                              width="40"
+                              height="40"
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
                           )}

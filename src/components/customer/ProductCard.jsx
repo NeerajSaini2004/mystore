@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CheckCircle2, XCircle, Tag, Eye } from 'lucide-react';
 import { formatCurrency } from '../../utils/calculations';
 import { useStore } from '../../context/StoreContext';
+import { OptimizedImage } from '../common/OptimizedImage';
 
-export function ProductCard({ product }) {
+export function ProductCard({ product, priority = false }) {
   const { store, setSelectedProduct } = useStore();
-  const [imageError, setImageError] = useState(false);
 
   if (!product) return null;
 
@@ -15,16 +15,6 @@ export function ProductCard({ product }) {
       ? Math.round(((product.mrp - product.selling_price) / product.mrp) * 10000) / 100
       : 0);
 
-  const handleWhatsAppInquiry = (e) => {
-    e.stopPropagation();
-    if (!store?.whatsapp) return;
-    const cleanNumber = store.whatsapp.replace(/[^0-9]/g, '');
-    const text = encodeURIComponent(
-      `Hi ${store.name}, I want to check availability for: "${product.name}" (${product.pack_size || ''}) priced at ${formatCurrency(product.selling_price)}.`
-    );
-    window.open(`https://wa.me/${cleanNumber}?text=${text}`, '_blank');
-  };
-
   return (
     <div
       onClick={() => setSelectedProduct(product)}
@@ -32,20 +22,14 @@ export function ProductCard({ product }) {
     >
       {/* Product Image Container */}
       <div className="relative aspect-square w-full bg-stone-100 overflow-hidden">
-        {product.image_url && !imageError ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            onError={() => setImageError(true)}
-            loading="lazy"
-            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-stone-100 text-stone-400 p-4 text-center">
-            <span className="text-3xl mb-1">📦</span>
-            <span className="text-xs font-medium text-stone-500">{product.brand || 'Store Item'}</span>
-          </div>
-        )}
+        <OptimizedImage
+          src={product.image_url}
+          alt={product.name}
+          width={360}
+          priority={priority}
+          fallbackText={product.brand || 'Store Item'}
+          className="group-hover:scale-105 transition-transform duration-300"
+        />
 
         {/* Discount Badge */}
         {discountPercent > 0 && (
