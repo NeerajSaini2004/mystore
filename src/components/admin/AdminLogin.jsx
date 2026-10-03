@@ -5,8 +5,8 @@ import { useStore } from '../../context/StoreContext';
 
 export function AdminLogin() {
   const { store, setUser, navigateTo, isSupabaseConfigured } = useStore();
-  const [email, setEmail] = useState('admin@sainistore.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,6 +81,7 @@ export function AdminLogin() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="storeowner@example.com"
@@ -98,6 +99,7 @@ export function AdminLogin() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -129,24 +131,24 @@ export function AdminLogin() {
           </button>
         </form>
 
-        {/* 1-Tap Quick Demo Login for instant testing */}
-        <div className="mt-5 pt-5 border-t border-stone-100">
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            disabled={isSubmitting}
-            className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/80 font-bold text-xs transition flex items-center justify-center gap-2"
-          >
-            <Store className="w-4 h-4 text-amber-700" />
-            <span>1-Tap Demo Shopkeeper Access</span>
-          </button>
+        {/* 1-Tap Quick Demo Login - Only shown in local offline mode without Supabase */}
+        {!isSupabaseConfigured && (
+          <div className="mt-5 pt-5 border-t border-stone-100">
+            <button
+              type="button"
+              onClick={handleQuickDemoLogin}
+              disabled={isSubmitting}
+              className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/80 font-bold text-xs transition flex items-center justify-center gap-2"
+            >
+              <Store className="w-4 h-4 text-amber-700" />
+              <span>1-Tap Demo Shopkeeper Access (Local Mode)</span>
+            </button>
 
-          <p className="text-[11px] text-center text-slate-400 mt-2.5">
-            {isSupabaseConfigured
-              ? '✓ Supabase Auth is connected'
-              : '⚡ Local offline storage mode active. Connect Supabase in .env anytime.'}
-          </p>
-        </div>
+            <p className="text-[11px] text-center text-slate-400 mt-2.5">
+              ⚡ Local offline storage mode active. Connect Supabase to enable secure login.
+            </p>
+          </div>
+        )}
 
       </div>
     </div>
