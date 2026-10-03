@@ -164,21 +164,26 @@ export const storeService = {
    */
   async getPublicProducts(storeId = 'store_saini_001') {
     if (isSupabaseConfigured && supabase) {
-      // Query the safe public view
-      const { data, error } = await supabase
-        .from('public_store_products')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('name', { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from('public_store_products')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('name', { ascending: true });
 
-      if (!error && data && data.length > 0) return data;
+        if (!error && data && data.length > 0) return data;
+        if (error) {
+          console.warn('Supabase public_store_products error:', error.message);
+        }
+      } catch (err) {
+        console.warn('Failed to query public_store_products from Supabase:', err);
+      }
     }
 
     initializeLocalStorage();
     try {
       const raw = localStorage.getItem(PRODUCTS_KEY);
       const list = raw ? JSON.parse(raw) : DEFAULT_PRODUCTS;
-      // Strip cost_price to guarantee security compliance on customer side
       return list.map(({ cost_price, ...publicFields }) => ({
         ...publicFields,
         discount_percent: publicFields.mrp && publicFields.selling_price
@@ -195,13 +200,20 @@ export const storeService = {
    */
   async getAdminProducts(storeId = 'store_saini_001') {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('created_at', { ascending: false });
 
-      if (!error && data) return data;
+        if (!error && data && data.length > 0) return data;
+        if (error) {
+          console.warn('Supabase admin products error:', error.message);
+        }
+      } catch (err) {
+        console.warn('Failed to query products from Supabase:', err);
+      }
     }
 
     initializeLocalStorage();

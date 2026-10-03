@@ -1,10 +1,11 @@
-import React from 'react';
-import { X, Phone, MessageCircle, CheckCircle2, XCircle, Tag, MapPin, Share2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Phone, MessageCircle, CheckCircle2, XCircle, Tag, MapPin, Share2, Check } from 'lucide-react';
 import { formatCurrency } from '../../utils/calculations';
 import { useStore } from '../../context/StoreContext';
 
 export function ProductDetailModal() {
   const { selectedProduct, setSelectedProduct, store, categories } = useStore();
+  const [copied, setCopied] = useState(false);
 
   if (!selectedProduct) return null;
 
@@ -19,6 +20,45 @@ export function ProductDetailModal() {
     : 0;
 
   const handleClose = () => setSelectedProduct(null);
+
+  const handleShare = async () => {
+    const shareText = `Check out "${selectedProduct.name}" (${selectedProduct.pack_size || ''}) at ${store?.name || 'our store'} - ${formatCurrency(selectedProduct.selling_price)}`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: selectedProduct.name,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing product:', err);
+        }
+      }
+    }
+
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+      }
+    }
+  };
+
+  const handleWhatsAppInquiry = () => {
+    if (!store?.whatsapp) return;
+    const cleanNumber = store.whatsapp.replace(/[^0-9]/g, '');
+    const text = encodeURIComponent(
+      `Hi ${store.name}, I want to check availability for: "${selectedProduct.name}" (${selectedProduct.pack_size || ''}) priced at ${formatCurrency(selectedProduct.selling_price)}.`
+    );
+    window.open(`https://wa.me/${cleanNumber}?text=${text}`, '_blank');
+  };
 
   const handleCall = () => {
     if (store?.phone) {
@@ -47,11 +87,16 @@ export function ProductDetailModal() {
         <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
           <button
             onClick={handleShare}
-            className="p-2 rounded-full bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white shadow-md transition"
-            title="Share Product"
+            className="p-2 rounded-full bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white shadow-md transition relative"
+            title={copied ? "Copied to clipboard!" : "Share Product"}
             aria-label="Share Product"
           >
-            <Share2 className="w-4 h-4" />
+            {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
+            {copied && (
+              <span className="absolute -bottom-7 right-0 text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded shadow whitespace-nowrap">
+                Copied!
+              </span>
+            )}
           </button>
           <button
             onClick={handleClose}
@@ -178,21 +223,43 @@ export function ProductDetailModal() {
           </div>
         </div>
 
-        {/* Bottom Actions: Store Directions & Close */}
-        <div className="p-3 sm:p-4 bg-white border-t border-stone-200/80 flex items-center gap-2.5">
-          <button
-            onClick={handleClose}
-            className="px-4 py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-slate-700 font-bold text-sm transition active:scale-98"
-          >
-            Close
-          </button>
+        {/* Bottom Actions: Store Directions, WhatsApp Inquiry & Call */}
+        <div className="p-3 sm:p-4 bg-white border-t border-stone-200/80 flex flex-wrap sm:flex-nowrap items-center gap-2">
+          {store?.whatsapp && (
+            <button
+              onClick={handleWhatsAppInquiry}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-98"
+              title="Chat on WhatsApp"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Inquire</span>
+            </button>
+          )}
+
+          {store?.phone && (
+            <button
+              onClick={handleCall}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-98"
+              title="Call Store"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Call</span>
+            </button>
+          )}
 
           <button
             onClick={handleDirections}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm shadow-md transition active:scale-98"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-98"
           >
             <MapPin className="w-4 h-4 text-amber-300" />
-            <span>Store Directions & Location</span>
+            <span>Directions</span>
+          </button>
+
+          <button
+            onClick={handleClose}
+            className="px-3.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-slate-700 font-bold text-xs sm:text-sm transition active:scale-98"
+          >
+            Close
           </button>
         </div>
 
