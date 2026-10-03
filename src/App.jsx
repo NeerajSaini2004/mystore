@@ -14,9 +14,9 @@ import { AdminLayout } from './components/admin/AdminLayout';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
-  const { isAdminView, user, isLoading, error } = useStore();
+  const { isAdminView, user, isInitialLoading, error, store } = useStore();
 
-  if (isLoading) {
+  if (isInitialLoading && !store) {
     return (
       <div className="min-h-screen bg-[#faf8f5] flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 rounded-2xl bg-emerald-900 text-amber-300 flex items-center justify-center shadow-lg animate-bounce">

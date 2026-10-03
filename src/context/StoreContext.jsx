@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { storeService } from '../services/storeService';
 import { authService } from '../services/authService';
 import { isSupabaseConfigured } from '../config/supabase';
@@ -6,11 +6,14 @@ import { isSupabaseConfigured } from '../config/supabase';
 const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
-  // Store metadata
+  // Store metadata & Progressive loading states
   const [store, setStore] = useState(null);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // Decoupled loading states for instant UI rendering
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Authentication & Admin state
@@ -24,7 +27,11 @@ export function StoreProvider({ children }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  // Check URL path or hash to toggle admin view on initial load
+  // Guard refs to prevent duplicate fetches from React StrictMode & re-renders
+  const initialLoadTriggeredRef = useRef(false);
+  const prevUserRef = useRef(null);
+
+  // Check URL path or hash to toggle admin view
   useEffect(() => {
     const checkRoute = () => {
       const path = window.location.pathname;
@@ -56,52 +63,112 @@ export function StoreProvider({ children }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Load Auth State
+  // Optimized Single Initial Data Loading Flow
+  const loadInitialData = useCallback(async (isAuthUser = false) => {
+    setError(null);
+    setIsProductsLoading(true);
+
+    try {
+      // 1. Parallel fetch: Launch store, categories, and products simultaneously from t=0
+      const storePromise = storeService.getStore();
+      const categoriesPromise = storeService.getCategories();
+      const productsPromise = isAuthUser
+        ? storeService.getAdminProducts()
+        : storeService.getPublicProducts();
+
+      // 2. Early resolution: As soon as store shell and categories arrive (~400ms),
+      // dismiss full-page loading and show header/categories/hero immediately!
+      Promise.all([storePromise, categoriesPromise])
+        .then(([storeData, categoriesData]) => {
+          setStore(storeData);
+          setCategories(categoriesData || []);
+          setIsInitialLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to load store shell:', err);
+          setIsInitialLoading(false);
+        });
+
+      // 3. Resolve products concurrently without blocking the store header
+      const productsData = await productsPromise;
+      setProducts(productsData || []);
+    } catch (err) {
+      console.error('Failed to load initial catalogue data:', err);
+      setError('Unable to load store catalogue. Please check your connection.');
+    } finally {
+      setIsInitialLoading(false);
+      setIsProductsLoading(false);
+    }
+  }, []);
+
+  // Initial mount trigger (Runs ONCE, safe from StrictMode double-call)
   useEffect(() => {
-    authService.getCurrentUser().then(setUser);
-    const unsubscribe = authService.onAuthStateChange(setUser);
+    if (initialLoadTriggeredRef.current) return;
+    initialLoadTriggeredRef.current = true;
+
+    // Check auth session once on boot, then start parallel fetch
+    authService.getCurrentUser().then((initialUser) => {
+      setUser(initialUser);
+      prevUserRef.current = initialUser;
+      loadInitialData(Boolean(initialUser));
+    });
+
+    // Listen for future auth changes (login/logout events)
+    const unsubscribe = authService.onAuthStateChange((nextUser) => {
+      const prevWasAuth = Boolean(prevUserRef.current);
+      const nextIsAuth = Boolean(nextUser);
+      setUser(nextUser);
+      prevUserRef.current = nextUser;
+
+      // Only re-fetch products if the user transitioned between guest and authenticated admin
+      if (prevWasAuth !== nextIsAuth) {
+        setIsProductsLoading(true);
+        const fetcher = nextIsAuth
+          ? storeService.getAdminProducts(undefined, true)
+          : storeService.getPublicProducts(undefined, true);
+
+        fetcher
+          .then((data) => setProducts(data || []))
+          .finally(() => setIsProductsLoading(false));
+      }
+    });
+
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [loadInitialData]);
 
-  // Fetch Store Data (Store details, Categories, and Products)
-  const refreshData = useCallback(async () => {
-    setIsLoading(true);
+  // Explicit Refresh for Admin mutations (e.g. after adding/editing products or settings)
+  const refreshData = useCallback(async (force = true) => {
     setError(null);
+    setIsProductsLoading(true);
     try {
-      const storeData = await storeService.getStore();
-      const categoriesData = await storeService.getCategories();
-      
-      // If user is authenticated admin, load admin products (with cost_price); else safe public products
-      const isAuthAdmin = Boolean(user);
-      const productsData = isAuthAdmin 
-        ? await storeService.getAdminProducts()
-        : await storeService.getPublicProducts();
+      const isAuth = Boolean(user);
+      const [storeData, categoriesData, productsData] = await Promise.all([
+        storeService.getStore(undefined, force),
+        storeService.getCategories(undefined, force),
+        isAuth ? storeService.getAdminProducts(undefined, force) : storeService.getPublicProducts(undefined, force),
+      ]);
 
       setStore(storeData);
-      setCategories(categoriesData);
-      setProducts(productsData);
+      setCategories(categoriesData || []);
+      setProducts(productsData || []);
     } catch (err) {
-      console.error('Failed to load store catalog data:', err);
-      setError('Unable to load store catalogue. Please check your connection.');
+      console.error('Failed to refresh data:', err);
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsProductsLoading(false);
     }
   }, [user]);
 
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
-
-  // Dynamic document title & meta tags based on store data
+  // Dynamic document title based on store data
   useEffect(() => {
     if (store?.name) {
       document.title = `${store.name} | Live Digital Catalogue & Availability`;
     }
   }, [store]);
 
-  // Fast Client-Side Product Filter & Fuzzy Search
+  // Fast Client-Side Product Filter & Search
   const filteredProducts = useMemo(() => {
     if (!products) return [];
 
@@ -162,7 +229,10 @@ export function StoreProvider({ children }) {
     filteredProducts,
     featuredProducts,
     categoryCounts,
-    isLoading,
+    // Loading states
+    isLoading: isInitialLoading, // Backwards compatible
+    isInitialLoading,
+    isProductsLoading,
     error,
     refreshData,
     // Filters & Search

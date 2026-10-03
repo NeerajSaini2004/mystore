@@ -14,7 +14,7 @@ export function ProductGrid() {
     setAvailabilityFilter,
     searchQuery,
     setSearchQuery,
-    isLoading
+    isProductsLoading,
   } = useStore();
 
   const currentCategoryObj = categories.find((c) => c.id === selectedCategory);
@@ -81,12 +81,21 @@ export function ProductGrid() {
         </div>
 
         <div className="text-xs text-slate-500 font-medium">
-          Showing <span className="font-bold text-slate-800">{filteredProducts.length}</span> products
+          {isProductsLoading ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-800 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
+              Checking catalogue availability...
+            </span>
+          ) : (
+            <>
+              Showing <span className="font-bold text-slate-800">{filteredProducts.length}</span> products
+            </>
+          )}
         </div>
       </div>
 
       {/* Featured Products Spotlight (Only displayed on default All view when not actively searching) */}
-      {selectedCategory === 'all' && !searchQuery && availabilityFilter === 'all' && featuredProducts.length > 0 && (
+      {!isProductsLoading && selectedCategory === 'all' && !searchQuery && availabilityFilter === 'all' && featuredProducts.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-amber-500" />
@@ -112,8 +121,29 @@ export function ProductGrid() {
         </div>
       )}
 
-      {/* Products Grid */}
-      {filteredProducts.length > 0 ? (
+      {/* Products Grid or Progressive Skeleton Loading State */}
+      {isProductsLoading ? (
+        /* Non-blocking Progressive Skeleton Grid */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 animate-pulse">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((index) => (
+            <div
+              key={`skeleton-${index}`}
+              className="bg-white rounded-2xl border border-stone-200/80 p-3 sm:p-3.5 flex flex-col justify-between"
+            >
+              <div>
+                <div className="aspect-square w-full bg-stone-200/80 rounded-xl mb-3"></div>
+                <div className="h-3 bg-stone-200/80 rounded w-1/3 mb-2"></div>
+                <div className="h-4 bg-stone-200/80 rounded w-4/5 mb-1.5"></div>
+                <div className="h-3 bg-stone-100 rounded w-1/2"></div>
+              </div>
+              <div className="mt-4 pt-2.5 border-t border-stone-100 flex items-center justify-between">
+                <div className="h-5 bg-stone-200/80 rounded w-16"></div>
+                <div className="h-4 bg-stone-100 rounded w-10"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
